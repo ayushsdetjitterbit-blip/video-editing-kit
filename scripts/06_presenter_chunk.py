@@ -7,9 +7,17 @@ ort.set_default_logger_severity(4); cv2.setNumThreads(2)
 M=S+"/v8/models/"
 raw=subprocess.run(["ffmpeg","-v","error","-i","clean_dn.mp4","-f","rawvideo","-pix_fmt","bgr24","-"],capture_output=True).stdout
 A0,A1=int(sys.argv[1]),int(sys.argv[2]); fr=np.frombuffer(raw,np.uint8).reshape(-1,850,478,3)[A0:A1]; n=len(fr); print(A0,A1,n,flush=True)
-cc=cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_alt2.xml")
+def _cascade():
+    # opencv-python 4.x ships the face cascade; the 5.x wheels do not, so download it once if it is missing
+    p = os.path.join(getattr(getattr(cv2, "data", None), "haarcascades", ""), "haarcascade_frontalface_alt2.xml")
+    if not os.path.exists(p):
+        p = os.path.join(S, "v8", "haarcascade_frontalface_alt2.xml")
+        if not os.path.exists(p):
+            import urllib.request; os.makedirs(os.path.dirname(p), exist_ok=True)
+            urllib.request.urlretrieve("https://raw.githubusercontent.com/opencv/opencv/4.x/data/haarcascades/haarcascade_frontalface_alt2.xml", p)
+    return cv2.CascadeClassifier(p)
+cc=_cascade()
 gp=ort.InferenceSession(M+"gpen_bfr_512.onnx",providers=["CPUExecutionProvider"],sess_options=(lambda o:(setattr(o,"intra_op_num_threads",3),o)[1])(ort.SessionOptions()))
-mn=ort.InferenceSession(M+"modnet.onnx",providers=["CPUExecutionProvider"]); mnn=mn.get_inputs()[0].name
 Y,X=np.mgrid[0:1920,0:1080].astype(np.float32)
 vig=(0.9+0.1*(1-np.clip(np.sqrt(((X-540)/700)**2+((Y-800)/1200)**2),0,1)))[...,None]
 yy,xx=np.mgrid[0:600,0:600].astype(np.float32)
@@ -23,10 +31,6 @@ for i,f in enumerate(fr):
     if len(r):
         x,y,w,h=max(r,key=lambda b:b[2]*b[3]); b=np.array([x+w/2,y+h/2,w],float)*(1080/478); box=b if box is None else .8*box+.2*b
     base=cv2.resize(f,(1080,1920),interpolation=cv2.INTER_LANCZOS4)
-    # matte (temporal smoothing)
-    x_=cv2.resize(f,(480,864)); x_=((cv2.cvtColor(x_,cv2.COLOR_BGR2RGB).astype(np.float32)/255-.5)/.5).transpose(2,0,1)[None]
-    if i%2==0:
-        m=mn.run(None,{mnn:x_})[0][0,0]; m=cv2.resize(m,(1080,1920),interpolation=cv2.INTER_CUBIC).clip(0,1); pm=m if pm is None else .5*m+.5*pm
     out=base
     if i%2==1 and dface is not None:
         x0,y0,side,D=dface; out=base.copy(); out[y0:y0+side,x0:x0+side]=np.clip(base[y0:y0+side,x0:x0+side].astype(np.float32)+D,0,255).astype(np.uint8)

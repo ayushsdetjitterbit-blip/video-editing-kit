@@ -1,7 +1,7 @@
 # python 3.11+ ; ffmpeg + ffprobe on PATH ; Node 22+ for HyperFrames (npx hyperframes)
 numpy
 scipy
-opencv-python
+opencv-python>=4.9,<5   # 5.x wheels lack the haar cascade data (the script downloads it if missing)
 onnxruntime
 faster-whisper==1.2.1
 noisereduce

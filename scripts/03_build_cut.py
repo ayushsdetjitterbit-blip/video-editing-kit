@@ -3,13 +3,15 @@ Needs src.mp4, tr2.json (from 02_transcribe_windows.py). Frame-exact: 30 fps, 14
 Edit START_OVERRIDE if a window starts with a breath / filler that you want trimmed (window index -> source seconds)."""
 import json, subprocess
 F = 30
-START_OVERRIDE = {}        # e.g. {5: 29.97}
+START_OVERRIDE = {5: 29.97}   # window 5 starts with a breath: real speech begins at 29.97 s
+LAST_END = 93.78              # keep the tail of the last word ("thank you"); None = last phrase end + 0.10 s        # e.g. {5: 29.97}
 win = json.load(open("tr2.json"))
 segs = []
 for k, s in enumerate(win):
     a = START_OVERRIDE.get(k, s["a"]); b = s["b"]
     segs.append([a - 0.07, b + 0.10])                  # keep 70 ms before and 100 ms after every phrase
 segs[0][0] = max(0, segs[0][0])
+if LAST_END: segs[-1][1] = LAST_END
 fr = lambda t: round(t * F)
 keep = []
 for a, b in segs:

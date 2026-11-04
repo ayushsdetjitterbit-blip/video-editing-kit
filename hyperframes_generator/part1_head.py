@@ -7,9 +7,9 @@ panel mode shrinks the presenter to the top and puts B-roll / lists / diagrams i
 import json, os
 P = KP
 S = KW
-DUR = 89.27
 BG = "#B4AFA5"
 keep = json.load(open(S + "/n1/timeline.json"))["keep"]
+DUR = round(sum(e - s_ for s_, e in keep), 2)          # length of the cut video
 seams, a_ = [], 0.0
 for s_, e_ in keep[:-1]: a_ += e_ - s_; seams.append(round(a_, 3))
 

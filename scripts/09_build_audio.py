@@ -5,7 +5,7 @@ KS = os.environ.get("KIT_SEG_PROJECT", KP + "_seg")
 """Step 3 sound: enhanced voice (untouched character) + Mixkit music bed (EQ-carved, ducked) + SFX locked to the on-screen events."""
 import json, wave, subprocess, numpy as np
 S = KW; A = S + "/n1/audio"
-DUR = 89.27 + 0.05
+DUR = round(sum(e - s_ for s_, e in json.load(open(S + "/n1/timeline.json"))["keep"]), 2) + 0.05
 sched = json.load(open(S + "/v9/schedule.json")); EV = sched["events"]; SEAMS = sched["seams"]
 exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "audio_helpers.py")).read().split("# ---------- music bed")[0].replace("DUR = 35.34", f"DUR = {DUR}"))
 

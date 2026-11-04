@@ -5,7 +5,13 @@ KS = os.environ.get("KIT_SEG_PROJECT", KP + "_seg")
 import json, re
 S0 = KW
 P = KS
-T0, T1 = 80.15, 83.90; D = round(T1 - T0, 3)
+# time window of the scene to replace (clean-cut seconds): the "dont" scene is host start 80.15 s, 3.75 s long
+T0, T1 = float(os.environ.get("SEG_T0", 80.15)), float(os.environ.get("SEG_T1", 83.90))
+os.makedirs(KS + "/compositions", exist_ok=True)
+for name in ("assets", "hyperframes.json", "meta.json", "package.json"):      # the segment project reuses the main project's assets
+    dst = os.path.join(KS, name)
+    if not os.path.lexists(dst) and os.path.exists(os.path.join(KP, name)): os.symlink(os.path.join(KP, name), dst)
+D = round(T1 - T0, 3)
 svg = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "seg_svg.txt")).read()
 sched = json.load(open(S0 + "/v9/schedule.json"))
 groups = []
