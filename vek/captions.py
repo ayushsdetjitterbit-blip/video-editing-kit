@@ -35,6 +35,15 @@ def chunks_from_transcript(transcript, timeline, cfg, windows_kept):
         flush()
     return out
 
+def chunks_from_file(path, transcript):
+    """Hand-corrected caption chunks: a YAML list of {t: source_seconds, text: "..."} (t = when the first word is spoken).
+    Use this when Whisper's spelling is too poor (Hindi/Hinglish, names, technical terms). Words are timed proportionally inside each chunk."""
+    ch = yaml.safe_load(open(path)) or []; wins = transcript["windows"]; out = []
+    for c in sorted(ch, key=lambda c: float(c["t"])):
+        t = float(c["t"]); w = next((w for w in wins if w["a"] - 0.3 <= t <= w["b"] + 0.3), None)
+        out.append((t, str(c["text"]), (w["b"] if w else t + 2.0)))
+    return out
+
 def build_groups(chunks, M, dur, fps):
     """Turn chunks into timed word groups on the cut timeline; every word's start is proportional to its length inside the chunk's time span."""
     groups = []

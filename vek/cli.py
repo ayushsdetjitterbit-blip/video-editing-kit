@@ -41,7 +41,8 @@ def run_pipeline(cfg_path, stages=None):
     groups = None
     if "compose" in want or "mix" in want or "render" in want:
         M = CA.mapper(tl); kept = sorted({w for seg in tl["windows_per_segment"] for w in seg})
-        chunks = CA.chunks_from_transcript(tr, tl, cfg, kept); groups = CA.apply_draft(CA.build_groups(chunks, M, round(tl["duration"], 2), meta["fps"]), work)
+        cf = os.path.join(os.path.dirname(os.path.abspath(cfg_path)), "captions_chunks.yaml")
+        chunks = CA.chunks_from_file(cf, tr) if os.path.exists(cf) else CA.chunks_from_transcript(tr, tl, cfg, kept); groups = CA.apply_draft(CA.build_groups(chunks, M, round(tl["duration"], 2), meta["fps"]), work)
         CA.write_draft(work, groups)
         R.init_project(project, cfg["render"]["hyperframes_version"], work, os.path.join(os.path.dirname(os.path.abspath(cfg_path)), "assets")); R.link_presenter(work, project)
         sched = CO.write_project(cfg, work, meta, tl, tr, groups, project)

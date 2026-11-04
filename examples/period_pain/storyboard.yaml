@@ -1,0 +1,71 @@
+beats:
+  # opening: hook, symptoms, who is speaking (cards sit below the chin)
+  - {type: card, at: 0.55, until: 2.4, icon: heart, color: "#FF375F", title: "Period Pain", sub: "Normal or a warning sign?", hook: true}
+  - {type: card, at: 5.9, until: 8.05, icon: pill, color: "#FF9F0A", title: "Cramps · Back pain", sub: "Common period symptoms"}
+  - {type: card, at: 8.75, until: 11.1, icon: user, color: "#5E5CE6", title: "Dr. Amrata Jain", sub: "Women's Health Education"}
+  # periods and pain: full-screen B-roll, then the two views
+  - {type: broll, file: m33383.mp4, at: 11.55, until: 14.35, label: "Period pain", icon: heart, color: "#FF375F", title: "Period pain", sub: "Cramps · mood · tiredness"}
+  - type: tiles
+    at: 14.4
+    until: 17.9
+    left:  {title: "Medical Science", sub: "Modern view", icon: stetho, color: "#0A84FF", color2: "#0B4FA8", at: 14.54}
+    right: {title: "Ayurveda आयुर्वेद", sub: "Traditional view", icon: doc, color: "#FF9F0A", color2: "#B35F00", at: 15.76}
+  # the medical term and the two types
+  - type: term
+    at: 18.9
+    until: 25.2
+    small: "Medical term for painful periods"
+    term: "Dysmenorrhea"
+    sub: "Painful menstruation · पीरियड्स का दर्द"
+    term_at: 20.9
+    chips:
+      - {text: "Type 1 · Primary", color: "#0A84FF", at: 23.4}
+      - {text: "Type 2 · Secondary", color: "#FF9F0A", at: 24.1}
+  - type: tiles
+    at: 25.45
+    until: 29.6
+    left:  {title: "Primary", sub: "Dysmenorrhea", icon: check, color: "#0A84FF", color2: "#0B4FA8", at: 25.83}
+    right: {title: "Secondary", sub: "Dysmenorrhea", icon: warn, color: "#FF9F0A", color2: "#B35F00", at: 27.27}
+  - type: checklist
+    title: "Primary dysmenorrhea"
+    at: 29.8
+    until: 36.4
+    items: [{at: 31.4, text: "Happens during periods"}, {at: 33.9, text: "Pain & cramps"}]
+  - {type: broll, file: m6061.mp4, at: 36.5, until: 43.8, label: "Uterus · normal", icon: heart, color: "#FF375F", title: "No sign of disease", sub: "Primary pain is normal"}
+  - type: checklist
+    title: "Why it happens"
+    at: 43.9
+    until: 54.3
+    items: [{at: 44.1, text: "Not severe"}, {at: 46.6, text: "Prostaglandin chemicals ↑"}, {at: 50.5, text: "Uterus contractions"}]
+  # secondary type
+  - type: checklist
+    style: warn
+    title: "Secondary dysmenorrhea"
+    at: 54.7
+    until: 71.1
+    items:
+      - {at: 58.0, text: "Internal condition"}
+      - {at: 62.4, text: "Fibroid · गांठ"}
+      - {at: 64.5, text: "Uterine muscle changes"}
+      - {at: 70.0, text: "Pain may increase"}
+  - {type: broll, file: m24658.mp4, at: 57.95, until: 60.35, label: "Internal condition", icon: warn, color: "#FF9F0A", title: "Internal condition", sub: "Pain from an underlying cause"}
+  # Ayurveda
+  - {type: card, at: 71.4, until: 73.65, icon: doc, color: "#FF9F0A", title: "आयुर्वेद · Ayurveda", sub: "कष्टार्तव · Kashta Artava"}
+  - {type: broll, file: br_herbal_oil.mp4, at: 73.95, until: 77.95, label: "Ayurveda · आयुर्वेद", icon: doc, color: "#FF9F0A", title: "अपान वायु", sub: "Apana Vata · plays an important role"}
+  - type: checklist
+    style: warn
+    title: "Painful periods when"
+    at: 78.5
+    until: 84.6
+    items: [{at: 78.9, text: "आर्तव flow is disturbed"}, {at: 81.1, text: "Normal flow becomes difficult"}, {at: 82.9, text: "Pain is felt"}]
+  # closing
+  - {type: still, icon: stetho, at: 84.65, until: 88.3, label: "See a gynaecologist", title: "Don't ignore severe pain", sub: "It is not always normal"}
+  - type: follow
+    at: 88.45
+    until: 93.78
+    name: "Dr. Amrata Jain"
+    handle: "Women's Health Education"
+    heading: "Women's Health"
+    subheading: "Follow for more health education"
+    thanks: "Thank you 🙏"
+    click_at: 92.4

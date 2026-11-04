@@ -1,0 +1,9 @@
+# The exact setup used to rebuild the period-pain video with vek. Put the original recording next to this folder as period_pain.mp4,
+# B-roll files in ./assets (Mixkit #33383, #24658, #6061, #33000 -> br_herbal_oil.mp4) and a licensed music file as assets/music.mp3.
+input: ../period_pain.mp4
+workdir: work
+language: hi
+graphics:
+  storyboard: storyboard.yaml
+audio:
+  music: assets/music.mp3

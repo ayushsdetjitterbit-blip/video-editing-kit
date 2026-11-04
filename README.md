@@ -34,7 +34,7 @@ See `docs/STORYBOARD.md` and `configs/example_storyboard.yaml`. B-roll files go 
 - Landscape canvas supports captions, progress bar, `broll` and `still` beats only; the card/panel layout is designed for vertical video.
 - Videos with few faces (vlogs) are detected as *scene videos*: cards move to the lower area and panels are refused unless you set `force: true`.
 - The storyboard text and B-roll choice are content decisions and stay manual (or are written by an assistant from `vek draft`).
-- Hindi/Hinglish transcripts need a quick read: Whisper mis-hears names and English words. Fix with `captions.corrections` or by editing `captions_draft.yaml` -> save as `captions_edited.yaml`.
+- Hindi/Hinglish transcripts need a quick read: Whisper mis-hears names and English words. Three ways to fix: `captions.corrections` (word map), edit `work/captions_draft.yaml` and save it as `work/captions_edited.yaml`, or write `captions_chunks.yaml` next to `config.yaml` (`- {t: <source seconds>, text: "..."}`) to replace the transcript-based captions completely.
 
 ## Layout
 `vek/` the package, `tests/` unit tests (`python -m unittest discover -s tests`), `configs/` examples, `docs/`, `legacy/period-pain/` the original one-video scripts this kit was generalised from.
