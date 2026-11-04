@@ -1,0 +1,12 @@
+input: ../my_video.mp4          # relative paths are relative to this file
+workdir: work
+language: hi                    # hi for Hindi/Hinglish, en for English, auto to detect (auto often says Urdu for Hinglish)
+captions:
+  corrections: {flavor: labour} # fix words Whisper spells wrongly
+graphics:
+  storyboard: storyboard.yaml
+audio:
+  music: null                   # path to a music file you have the licence for, or leave empty
+picture:
+  look: natural                 # natural | punchy | off
+  face_restore: auto            # auto | gpen | off

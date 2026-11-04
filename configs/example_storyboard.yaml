@@ -1,0 +1,32 @@
+beats:
+  - type: card
+    at: 0.4
+    until: 2.6
+    icon: star
+    color: "#0A84FF"
+    title: "A day at NIA"
+    sub: "Practical learning"
+    hook: true
+  - type: broll
+    file: m6061.mp4
+    say: "ANC"
+    until_say: "Patients"
+    label: "ANC · Antenatal care"
+    icon: heart
+    color: "#FF375F"
+    title: "Antenatal care"
+    sub: "Patient history · fundal height"
+  - type: checklist
+    title: "What I practised"
+    at: 14.0
+    until: 21.4
+    items:
+      - {say: "History", text: "Took patient history"}
+      - {say: "Fundal", text: "Checked fundal height"}
+  - type: card
+    at: 25.8
+    until: 29.8
+    icon: doc
+    color: "#FF9F0A"
+    title: "Stages of labour"
+    sub: "and management"
