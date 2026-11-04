@@ -31,6 +31,7 @@ Run the `n1` scripts from `$KIT_WORK/n1`.
 | 5 | `05_enhance_voice.py` | noise reduction (noise profile from the pauses), light EQ, loudness; verifies pitch is unchanged |
 | 6 | `06b_denoise_for_presenter.sh`, `06_run_chunks.sh` (+ `06_presenter_chunk.py`) | face restoration (GPEN) in 300-frame chunks that can be resumed |
 | 7 | `08_join_presenter_chunks.sh`, `07_relight.py` | joins chunks, then keeps GPEN detail but takes lighting and skin tone from the real footage -> `presenter3.mp4` (copy to `$KIT_PROJECT/assets/presenter.mp4`) |
+| 7b | `07b_apply_look.sh` | the "P1" look (highlight protection, natural colour) -> `presenter4.mp4`, the file the project uses as `assets/presenter.mp4` |
 | 8 | `npx hyperframes@0.8.225 init` once (see below), then `10_build_project.sh` | builds the HyperFrames project from `hyperframes_generator/` (graphics, B-roll scenes, captions) |
 | 9 | `09_build_audio.py` | voice + ducked music + synthesised sound effects locked to the on-screen events -> `n1/audio/mix6.wav` -> `ffmpeg ... mix.m4a` into `assets/` |
 | 10 | `11_render.sh` | final render |
@@ -44,7 +45,7 @@ cd $KIT_WORK && npx --yes hyperframes@0.8.225 init scaffold --example blank --re
 mkdir -p project/assets/fonts project/compositions
 cp scaffold/{AGENTS.md,CLAUDE.md,hyperframes.json,meta.json,package.json} project/
 ```
-Then run the `00_download_*` scripts, copy `n1/presenter3.mp4` to `project/assets/presenter.mp4`, copy `n1/audio/mix.m4a` (from `mix6.wav`, see below) into `project/assets/`, and run `10_build_project.sh` and `11_render.sh`. HyperFrames releases change often; the video was rendered with 0.8.222-0.8.225, so pin that version.
+Then run the `00_download_*` scripts, copy `n1/presenter4.mp4` to `project/assets/presenter.mp4`, copy `n1/audio/mix.m4a` (from `mix6.wav`, see below) into `project/assets/`, and run `10_build_project.sh` and `11_render.sh`. HyperFrames releases change often; the video was rendered with 0.8.222-0.8.225, so pin that version.
 
 ```sh
 ffmpeg -i n1/audio/mix6.wav -af "volume=-1.0dB,alimiter=limit=0.89:level=disabled" -c:a aac -b:a 256k project/assets/mix.m4a

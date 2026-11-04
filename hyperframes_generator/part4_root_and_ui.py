@@ -39,7 +39,7 @@ root = f'''<!doctype html>
       #bg {{ position: absolute; inset: 0; background: {BG}; }}
       #pw {{ position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; transform-origin: 50% 0%; }}
       #pzoom {{ position: absolute; inset: 0; transform-origin: 50% 30%; }}
-      #presenter {{ position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; object-fit: cover; filter: brightness(.93) contrast(1.06) saturate(1.04); }}
+      #presenter {{ position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; object-fit: cover; }}
       #stackfade {{ position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; opacity: 0; background: linear-gradient(180deg, rgba(180,175,165,0) 0px, rgba(180,175,165,0) 790px, {BG} 842px, {BG} 100%); }}
       #sidefade {{ position: absolute; left: 0; top: 0; width: 1080px; height: 860px; opacity: 0; background: linear-gradient(90deg, {BG} 0px, {BG} 124px, rgba(180,175,165,0) 196px, rgba(180,175,165,0) 884px, {BG} 956px, {BG} 100%); }}
       #aur {{ position: absolute; left: 0; top: 1290px; width: 1080px; height: 630px; opacity: 0; overflow: hidden; }}

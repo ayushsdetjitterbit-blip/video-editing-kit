@@ -92,7 +92,7 @@ open(P + "/index.html", "w").write(f'''<!doctype html>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
 <style> * {{ margin:0; padding:0; box-sizing:border-box; }} html, body {{ margin:0; width:1080px; height:1920px; overflow:hidden; background:#B4AFA5; }}
  #pw {{ position:absolute; left:0; top:0; width:1080px; height:1920px; }} #pzoom {{ position:absolute; inset:0; transform-origin:50% 30%; }}
- #presenter {{ position:absolute; left:0; top:0; width:1080px; height:1920px; object-fit:cover; filter: brightness(.93) contrast(1.06) saturate(1.04); }}</style></head>
+ #presenter {{ position:absolute; left:0; top:0; width:1080px; height:1920px; object-fit:cover; }}</style></head>
 <body><div id="root" data-composition-id="main" data-start="0" data-duration="{D}" data-width="1080" data-height="1920">
 <div id="pw" data-layout-allow-overflow><div id="pzoom" data-layout-allow-overflow><video id="presenter" class="clip" src="assets/presenter.mp4" muted playsinline data-start="0" data-duration="{D}" data-media-start="{T0}" data-track-index="0"></video></div></div>
 <div id="dont" data-composition-id="dont" data-composition-src="compositions/dont.html" data-start="0" data-duration="{D}" data-track-index="3" data-track-kind="graphics" data-width="1080" data-height="1920"></div>
