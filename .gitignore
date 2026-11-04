@@ -1,0 +1,16 @@
+# media, models, caches and keys stay out of git
+*.mp4
+*.mov
+*.wav
+*.m4a
+*.mp3
+*.onnx
+*.npy
+*.f32
+chunks*/
+audio/
+renders/
+.hyperframes/
+node_modules/
+.env
+__pycache__/

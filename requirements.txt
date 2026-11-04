@@ -1,0 +1,8 @@
+# python 3.11+ ; ffmpeg + ffprobe on PATH ; Node 22+ for HyperFrames (npx hyperframes)
+numpy
+scipy
+opencv-python
+onnxruntime
+faster-whisper==1.2.1
+noisereduce
+matplotlib
