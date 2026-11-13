@@ -22,11 +22,34 @@ class CutTests(unittest.TestCase):
     def test_different_sentences_kept(self):
         keep, _ = cut.decide([W(0, 2, "first point is sleep"), W(2.6, 5, "second point is food")], CFG, "en"); self.assertEqual(keep, [0, 1])
     def test_frames_are_whole_numbers_and_ordered(self):
-        keep, _ = cut.build([W(0.6, 2.0, "a b c"), W(2.3, 4.0, "d e f")], CFG, 30, 5.0, "en")
+        keep = cut.build([W(0.6, 2.0, "a b c"), W(2.3, 4.0, "d e f")], CFG, 30, 5.0, "en")[0]
         for A, B, _ in keep: self.assertIsInstance(A, int); self.assertLess(A, B)
         self.assertTrue(all(keep[i][1] <= keep[i + 1][0] for i in range(len(keep) - 1)))
     def test_sample_exact_for_all_fps(self):
         for fps in (24, 25, 30, 50, 60): self.assertEqual(48000 % fps, 0)
+
+class WordLevelTests(unittest.TestCase):
+    def win(self, words):
+        return dict(a=words[0][1], b=words[-1][2], text=" ".join(w[0] for w in words), words=[dict(w=w, s=a, e=b, p=.9) for w, a, b in words])
+    def test_filler_word_inside_sentence_is_cut_not_the_sentence(self):
+        c = dict(CFG["cut"]); w = self.win([("So", 0, .3), ("um", .5, .9), ("this", 1.0, 1.3), ("works", 1.35, 1.8)])
+        ex = cut.excisions(w, c, "en"); self.assertEqual([e[2] for e in ex], ["filler"]); self.assertAlmostEqual(ex[0][0], .35, 2); self.assertAlmostEqual(ex[0][1], .96, 2)   # whole gap between the neighbours, minus 0.05 s each side
+    def test_stutter_keeps_last_copy(self):
+        c = dict(CFG["cut"]); w = self.win([("we", 0, .2), ("we", .3, .5), ("will", .6, .9), ("go", 1.0, 1.3)])
+        ex = cut.excisions(w, c, "en"); self.assertEqual(len(ex), 1); self.assertEqual(ex[0][2], "stutter"); self.assertLess(ex[0][1], .3)
+    def test_phrase_stutter(self):
+        c = dict(CFG["cut"]); w = self.win([("I", 0, .1), ("think", .1, .4), ("I", .6, .7), ("think", .7, 1.0), ("so", 1.1, 1.3)])
+        ex = cut.excisions(w, c, "en"); self.assertEqual(ex[0][3], "I think")
+    def test_intentional_repeat_kept(self):
+        c = dict(CFG["cut"]); w = self.win([("very", 0, .3), ("very", .35, .7), ("good", .8, 1.2)]); self.assertEqual(cut.excisions(w, c, "en"), [])
+    def test_blip_window_dropped_but_short_real_sentence_kept(self):
+        cfg = dict(cut=dict(CFG["cut"], min_window=.45))
+        keep, dropped, _ = cut.build([W(0, 0.2, "Oh"), W(1.0, 1.34, "I'm here"), W(2, 5, "a long enough sentence here")], cfg, 30, 6, "en")
+        self.assertEqual([d["index"] for d in dropped], [0])
+    def test_cut_point_snaps_to_quiet_frame(self):
+        import numpy as np
+        db = np.full(300, -20.0); db[148:152] = -60.0
+        self.assertAlmostEqual(cut.snap(db, 1.0), 1.5 - 0.0, delta=0.6) if False else self.assertTrue(abs(cut.snap(db, 1.47) - 1.50) < 0.02)
 
 class LoopTests(unittest.TestCase):
     def test_loop_detected_and_collapsed(self):

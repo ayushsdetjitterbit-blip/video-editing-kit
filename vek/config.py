@@ -13,10 +13,15 @@ DEFAULTS = {
         "pad_before": 0.07, "pad_after": 0.10,
         "drop_fillers": True,            # drop a window that is ONLY a filler (um, uh, ...), never cut inside a sentence
         "trim_breath": True,            # trim a breath / mouth noise (>= 0.25 s) before the first word of a phrase
+        "drop_filler_words": True,       # cut um/uh/ahh/hmm words out of a sentence (at word boundaries, snapped to quiet points)
+        "drop_stutters": True,           # a word or 2-3 word phrase said twice in a row keeps only the last clean one
+        "min_window": 0.45,              # a 0-1 word / implausibly fast window shorter than this is noise or an interjection
+        "verbatim": True,                # transcribe disfluencies so they can be found
         "drop_repeats": True,            # keep the best of repeated / restarted sentences
         "repeat_similarity": 0.82,
         "tail_pad": 0.10,                # extra time kept after the last word
-        "start_overrides": {}, "end_overrides": {}, "drop_windows": [],   # manual fixes by window index
+        "start_overrides": {}, "end_overrides": {}, "drop_windows": [], "excise": [],   # excise: [[start, end], ...] source seconds to cut out of a sentence (hand-picked fumbles)
+        "keep_windows": [],   # manual fixes by window index
     },
     "voice": {"enhance": True, "target_lufs": -16, "noise_reduce": 0.85},
     "picture": {
@@ -34,6 +39,7 @@ DEFAULTS = {
 
 def load(path):
     cfg = yaml.safe_load(open(path)) or {}
+    cfg = {k: v for k, v in cfg.items() if v is not None or k in ("input", "workdir")}      # an empty section (`cut:` with nothing under it) means defaults
     cfg = deep_merge(DEFAULTS, cfg)
     base = os.path.dirname(os.path.abspath(path))
     for k in ("input", "workdir"):

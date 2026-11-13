@@ -91,6 +91,16 @@ def plan(cfg, st, meta):
     return p
 
 # ------------------------------------------------------------------ rendering
+def _sig(path, k): return f"{os.path.getsize(path)}:{int(os.path.getmtime(path))}:{k:.2f}"
+def _read_sig(dn):
+    try: return open(dn + ".sig").read()
+    except Exception: return ""
+def _drop_chunks(work):
+    """Chunks of restored faces belong to one specific cut; delete them when the cut (or the denoised source) changes."""
+    d = os.path.join(work, "chunks")
+    if os.path.isdir(d):
+        for f in os.listdir(d): os.remove(os.path.join(d, f))
+
 def _cover(f, cw, ch, cx):
     h, w = f.shape[:2]; s = max(cw / w, ch / h); nw, nh = int(round(w * s)), int(round(h * s))
     b = cv2.resize(f, (nw, nh), interpolation=cv2.INTER_LANCZOS4)
@@ -104,7 +114,8 @@ def presenter(cfg, work, meta, st, plan_):
     if plan_["denoise"] > 0:
         k = plan_["denoise"]; vf = f"hqdn3d={1 + 1.5 * k:.2f}:{1 + 1.0 * k:.2f}:{2 + 3 * k:.2f}:{2 + 2 * k:.2f}"
         dn = os.path.join(work, "clean_dn.mp4")
-        if not os.path.exists(dn): run(["ffmpeg", "-v", "error", "-y", "-i", src, "-vf", vf, "-c:v", "libx264", "-crf", "10", "-preset", "veryfast", "-an", dn])
+        if not os.path.exists(dn) or os.path.getmtime(dn) < os.path.getmtime(src) or _sig(src, k) != _read_sig(dn):          # re-make it when the cut changed
+            _drop_chunks(work); run(["ffmpeg", "-v", "error", "-y", "-i", src, "-vf", vf, "-c:v", "libx264", "-crf", "10", "-preset", "veryfast", "-an", dn]); open(dn + ".sig", "w").write(_sig(src, k))
         src = dn
     lf = look_filter(plan_["look"])
     if plan_["face_restore"] == "off":
@@ -112,6 +123,8 @@ def presenter(cfg, work, meta, st, plan_):
         run(["ffmpeg", "-v", "error", "-y", "-i", src, "-vf", ",".join(v for v in vfs if v != "null"), "-c:v", "libx264", "-crf", "12", "-preset", "medium",
              "-pix_fmt", "yuv420p", "-g", str(int(fps)), "-movflags", "+faststart", "-an", out_final]); return out_final
     # ---- face restoration, resumable chunks (each decoded on its own: memory stays bounded for any video length)
+    sigf = os.path.join(work, "chunks.sig"); cur = _sig(src, 0)
+    if (open(sigf).read() if os.path.exists(sigf) else "") != cur: _drop_chunks(work); open(sigf, "w").write(cur)
     import onnxruntime as ort
     ort.set_default_logger_severity(4); cv2.setNumThreads(2)
     so = ort.SessionOptions(); so.intra_op_num_threads = min(4, os.cpu_count() or 2)

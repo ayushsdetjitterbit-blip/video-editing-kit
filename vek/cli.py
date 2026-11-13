@@ -23,13 +23,15 @@ def run_pipeline(cfg_path, stages=None):
         meta = I.ingest(cfg, work); json.dump(meta, open(meta_p, "w")); S.mark("ingest", fp(cfg["input"], cfg["fps"], cfg["canvas"]))
     meta = json.load(open(meta_p))
     # ---- transcribe
-    if need("transcribe", cfg["input"], cfg["language"], cfg["cut"]["pause_min"]):
-        T.transcribe(work, cfg["language"], cfg["cut"]["pause_min"]); S.mark("transcribe", fp(cfg["input"], cfg["language"], cfg["cut"]["pause_min"]))
+    if need("transcribe", cfg["input"], cfg["language"], cfg["cut"]["pause_min"], cfg["cut"]["verbatim"]):
+        T.transcribe(work, cfg["language"], cfg["cut"]["pause_min"], verbatim=cfg["cut"]["verbatim"]); S.mark("transcribe", fp(cfg["input"], cfg["language"], cfg["cut"]["pause_min"], cfg["cut"]["verbatim"]))
     tr = json.load(open(os.path.join(work, "transcript.json")))
     # ---- cut
     if need("cut", cfg["input"], cfg["cut"], tr["language"]):
         K.cut_stage(cfg, work, meta); S.mark("cut", fp(cfg["input"], cfg["cut"], tr["language"])); [S.clear(s) for s in ("voice", "picture", "compose", "mix", "render", "qa")]
-    tl = json.load(open(os.path.join(work, "timeline.json")))
+    tp = os.path.join(work, "timeline.json")
+    if not os.path.exists(tp): return 0                       # only ingest/transcribe were requested
+    tl = json.load(open(tp))
     # ---- voice
     if need("voice", os.path.join(work, "timeline.json"), cfg["voice"]):
         V.build_raw(work, meta["fps"]); V.enhance(work, cfg); S.mark("voice", fp(os.path.join(work, "timeline.json"), cfg["voice"]))

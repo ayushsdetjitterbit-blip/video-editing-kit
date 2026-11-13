@@ -1,0 +1,25 @@
+input: ../speech_part.mp4
+workdir: work
+language: auto
+cut:
+  # reviewed by hand against transcript.json (and re-timed on tight 2-second clips): abandoned or repeated sentences
+  drop_windows: [31, 37, 41, 45]
+  drop_filler_words: false      # Whisper's word times are off by up to 0.3 s in this recording, so every uh is cut by hand from the energy curve
+  # fumbles cut out of sentences (source seconds)
+  excise:
+    - [3.82, 3.96]       # dangling "I" before "I'm here"
+    - [11.31, 11.53]     # "ad-" false start before "attend"
+    - [14.34, 14.70]     # "with the" (abandoned)
+    - [15.83, 16.03]     # stray "my,"
+    - [47.74, 48.12]     # "sig-" false start before "signifies"
+    - [53.95, 54.50]     # "in her," before "in herself"
+    - [108.79, 109.14]   # dangling "the"
+    - [5.67, 5.91]       # "uh" after "house"
+    - [8.53, 8.80]       # "and, uh,"
+    - [123.38, 124.66]   # "and, uh, uh" (two loud fillers, one after the other)
+    - [132.15, 132.60]   # "but, uh,"
+picture:
+  face_restore: "off"
+  look: natural
+graphics:
+  storyboard: null

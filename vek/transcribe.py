@@ -64,7 +64,12 @@ def collapse_loops(words, ns=(6, 5, 4, 3, 2, 1), times=3):
             k += 1
     return out
 
-def transcribe(work, language="auto", pause_min=0.25, model_size="large-v3"):
+VERBATIM_PROMPT = {
+    "en": "Umm, uh, so, I, I think that, uh, hmm, ahh, aa, we can, you know, like. Okay.",
+    "hi": "अम्म, उम, हम्म, आ, तो, मैं, मैं, मतलब, वो, अं. ठीक है.",
+}
+
+def transcribe(work, language="auto", pause_min=0.25, model_size="large-v3", verbatim=True, context=0.15):
     a16 = os.path.join(work, "a16.wav"); x = _read16(a16)
     runs = speech_runs(a16); win = windows(runs, pause_min)
     strict = strict_edges(a16, win)
@@ -74,10 +79,11 @@ def transcribe(work, language="auto", pause_min=0.25, model_size="large-v3"):
     lang = None if language == "auto" else language
     out = []; detected = None
     for k, (a, b) in enumerate(win):
-        A = max(0, a - 0.15); B = min(len(x) / 16000, b + 0.15)
+        A = max(0, a - context); B = min(len(x) / 16000, b + context)       # small context only: long context makes Whisper hallucinate on the neighbours
         def go(temps, beam):
-            return m.transcribe(x[int(A * 16000):int(B * 16000)], language=lang or detected, word_timestamps=True, vad_filter=False, condition_on_previous_text=False,
-                                beam_size=beam, temperature=temps, compression_ratio_threshold=2.0)
+            lg = lang or detected; pr = VERBATIM_PROMPT.get(lg) if verbatim else None       # the prompt makes Whisper write fillers (um, uh, ahh) instead of silently dropping them
+            return m.transcribe(x[int(A * 16000):int(B * 16000)], language=lg, word_timestamps=True, vad_filter=False, condition_on_previous_text=False,
+                                beam_size=beam, temperature=temps, compression_ratio_threshold=2.0, initial_prompt=pr)
         seg, info = go(0, 5); seg = list(seg)
         if has_loop([dict(w=q.word) for s_ in seg for q in s_.words]):            # hallucinated loop: retry with sampling, then collapse what is left
             log(f"  window {k}: repeated-phrase loop detected, retrying"); seg, info = go((0.2, 0.4, 0.6), 1); seg = list(seg)
