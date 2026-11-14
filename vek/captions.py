@@ -4,27 +4,35 @@ editable draft file (captions_draft.yaml) are supported: edit the text, keep the
 import json, os, re
 import yaml
 
-def mapper(timeline):
-    """source seconds -> cut timeline seconds."""
+def mapper(timeline, shift=0.0):
+    """source seconds -> final-video seconds (cut timeline + `shift`, the length of an intro placed before the talk)."""
     keep = timeline["keep"]; off = []; a = 0.0
     for s, e in keep: off.append(a); a += e - s
     def M(t):
         for (s, e), o in zip(keep, off):
-            if s - 1e-6 <= t <= e + 1e-6: return round(o + t - s, 3)
+            if s - 1e-6 <= t <= e + 1e-6: return round(o + t - s + shift, 3)
         for (s, e), o in zip(keep, off):
-            if t < s: return round(o, 3)
-        return round(a, 3)
+            if t < s: return round(o + shift, 3)
+        return round(a + shift, 3)
     return M
 
 def _apply_corrections(text, corr):
     for wrong, right in (corr or {}).items(): text = re.sub(re.escape(wrong), right, text, flags=re.IGNORECASE)
     return text
 
+FILLER_TOK = {"uh", "um", "umm", "uhh", "er", "erm", "ah", "ahh", "aa", "hmm", "mm", "eh"}
+
+def _removed(timeline, cfg):
+    spans = [(r["t"], r["t"] + r["len"]) for r in (timeline.get("removed") or [])]
+    return spans + [(float(a), float(b)) for a, b in cfg["cut"].get("excise", [])]
+
 def chunks_from_transcript(transcript, timeline, cfg, windows_kept):
     """[(src_start, text, src_end_of_window)] using whisper words; skips dropped windows."""
     cc = cfg["captions"]; out = []
     for wi in windows_kept:
-        w = transcript["windows"][wi]; words = [x for x in w["words"] if x["w"]]
+        w = transcript["windows"][wi]; spans = _removed(timeline, cfg)
+        words = [x for x in w["words"] if x["w"] and re.sub(r"[^a-z]", "", x["w"].lower()) not in FILLER_TOK
+                 and not any(a <= (x["s"] + x["e"]) / 2 <= b for a, b in spans)]               # words that were cut out of the video are not captioned
         cur = []
         def flush():
             if cur:

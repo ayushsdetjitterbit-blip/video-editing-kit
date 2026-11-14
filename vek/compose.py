@@ -67,7 +67,7 @@ ICON = {
   "mic": _sv('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>', 2.4),
   "flame": _sv('<path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 .3 1.6 1 2 2 2-.5-3 .5-5.5 1-8z" fill="#fff" stroke="none"/>'),
 }
-BEAT_TYPES = ("card", "broll", "checklist", "tiles", "term", "follow", "still")
+BEAT_TYPES = ("card", "chip", "broll", "checklist", "tiles", "term", "follow", "still")
 
 class StoryboardError(ValueError): pass
 
@@ -90,6 +90,7 @@ class Resolver:
         if earlier: raise StoryboardError(f"the words {phrase!r} are said at source {earlier[:3]}s, which is BEFORE this beat starts (cut-timeline {after:.1f}s). Move the beat earlier or use `at:` in seconds")
         raise StoryboardError(f"could not find the words {phrase!r} in the transcript. Use `at:` in seconds, or fix the spelling to match transcript.json")
     def t(self, spec, key, default=None, after=0.0):
+        if spec.get("final") and key in spec: return float(spec[key])             # `final: true` = seconds on the finished video (for beats over the intro)
         if key in spec: return self.M(float(spec[key]))
         say = {"at": "say", "until": "until_say"}.get(key)
         if say and say in spec:
@@ -99,8 +100,8 @@ class Resolver:
 
 class Faces:
     """Face boxes over time (from the final presenter video). Graphics are placed so that they never overlap a face; if a beat cannot avoid one, compose stops with a clear message."""
-    def __init__(self, track, cw, ch):
-        self.fr = [dict(f) for f in track["frames"]] if track else []; self.step = track["step"] if track else 0.5; self.ratio = track["found_ratio"] if track else 0
+    def __init__(self, track, cw, ch, shift=0.0):
+        self.fr = [dict(f, t=round(f["t"] + shift, 3)) for f in track["frames"]] if track else []; self.step = track["step"] if track else 0.5; self.ratio = track["found_ratio"] if track else 0
         ws = sorted(max(b[2] for b in f["boxes"]) for f in self.fr if f["boxes"])
         mw = ws[len(ws) // 2] if ws else 0
         for f in self.fr: f["boxes"] = [b for b in f["boxes"] if b[2] >= 0.5 * mw]        # drop small false detections (clothing patterns, posters)
@@ -141,11 +142,25 @@ def _span(B, R, spec, default_len=2.5, after=0.0):
     if b - a < 0.4: raise StoryboardError(f"beat is shorter than 0.4 s after clamping to the video: {spec}")
     return a, b
 
+def beat_chip(B, R, s):
+    """Small pill label near the top: for moments when the picture itself is the content (a painting close-up, a product) and a big card would hide it."""
+    a, b = _span(B, R, s, 3.0); eid = B.uid(); color = s.get("color", ACCENT); txt = s.get("title") or s.get("text", "")
+    wpx = int(min(1008, 150 + 22 * len(txt))); slots = [("left", 36), ("right", 1080 - 36 - wpx)]
+    pick = next(((n, x) for n, x in slots if not B.faces.overlaps((x, 190, wpx, 78), a, b)), None)
+    if pick is None: raise StoryboardError(f"chip {txt!r} at {a:.1f}-{b:.1f}s would cover a face at both top corners")
+    x = pick[1]
+    B.html.append(f'<div id="{eid}" class="chipl glass" style="top:196px;left:{x}px;opacity:0"><div class="dot" style="background:{color}">{_check_icon(s.get("icon", "star"))}</div><span>{txt}</span></div>')
+    B.js_add(f'tl.fromTo("#{eid}", {{opacity:0, y:-24, scale:.9, filter:"blur(8px)"}}, {{opacity:1, y:0, scale:1, filter:"blur(0px)", duration:.45, ease:"back.out(1.8)"}}, {a:.3f});')
+    B.js_add(f'tl.to("#{eid}", {{opacity:0, y:-12, duration:.25, ease:"power2.in"}}, {max(a, b - .25):.3f});'); B.js_add(f'tl.set("#{eid}", {{opacity:0}}, {b:.3f});')
+    B.ev("tick", a + 0.05); B.rect(x, 190, wpx, 78, a, b)
+
 def beat_card(B, R, s):
     a, b = _span(B, R, s); eid = B.uid(); color = s.get("color", ACCENT)
     slots = [int(s["y"])] if "y" in s else ([1340, 1270, 1200, 1130, 1072] if B.scene_mode else [1072, 1130, 1200, 1270, 1340])
     y = next((c_ for c_ in slots if not B.faces.overlaps((60, c_, 960, 164), a, b)), None)
-    if y is None: raise StoryboardError(f"card {s.get('title')!r} at {a:.1f}-{b:.1f}s would cover a face in every position; use a `broll` beat for this moment or move it")
+    if y is None:
+        if s.get("on_conflict") == "chip": return beat_chip(B, R, s)                      # no free slot (e.g. a painting close-up fills the frame): show a small label instead
+        raise StoryboardError(f"card {s.get('title')!r} at {a:.1f}-{b:.1f}s would cover a face in every position; use `on_conflict: chip` (small label), a `broll` beat, or move it")
     B.html.append(f'<div id="{eid}" class="fcard glass" style="top:{y}px"><div class="fic" style="background:{color}">{_check_icon(s.get("icon", "star"))}</div><div class="shim"></div><div class="ftx"><div class="ft">{s["title"]}</div><div class="fs">{s.get("sub", "")}</div></div></div>')
     B.enter_exit(eid, a, b, dy=50); B.ev("card", a, hook=bool(s.get("hook"))); B.rect(60, y, 960, 164, a, b)
 
@@ -247,7 +262,7 @@ def beat_follow(B, R, s):
     B.js_add(f'tl.fromTo("#{eid}-ty", {{opacity:0, y:24}}, {{opacity:1, y:0, duration:.5, ease:"expo.out"}}, {ck + .45:.3f});')
     B.ev("cta", a); B.ev("send", ck); B.rect(*_prect(y0, sc), a, b)
 
-BUILDERS = dict(card=beat_card, broll=beat_broll, still=beat_still, checklist=beat_checklist, tiles=beat_tiles, term=beat_term, follow=beat_follow)
+BUILDERS = dict(card=beat_card, chip=beat_chip, broll=beat_broll, still=beat_still, checklist=beat_checklist, tiles=beat_tiles, term=beat_term, follow=beat_follow)
 
 def load_storyboard(path):
     if not path: return []
@@ -260,10 +275,11 @@ def load_storyboard(path):
 
 def write_project(cfg, work, meta, timeline, transcript, groups, project):
     """Writes index.html + compositions into `project` and returns schedule {events, rects, seams}."""
-    dur = round(timeline["duration"], 2); fps = meta["fps"]; M = mapper(timeline); R = Resolver(transcript, M, dur)
+    shift = float(meta.get("intro_len", 0) or 0); sdur = round(timeline["duration"], 2); dur = round(sdur + shift, 2); fps = meta["fps"]
+    M = mapper(timeline, shift); R = Resolver(transcript, M, dur)
     cw, ch = meta["canvas"]; assets = os.path.join(project, "assets"); os.makedirs(os.path.join(project, "compositions"), exist_ok=True)
     from .picture import face_track
-    B = Builder(dur, fps, assets); track = face_track(work, meta); B.faces = Faces(track, cw, ch); B.scene_mode = track["found_ratio"] < 0.4   # few faces = a scene/vlog, not a talking head
+    B = Builder(dur, fps, assets); track = face_track(work, meta); B.faces = Faces(track, cw, ch, shift); B.scene_mode = track["found_ratio"] < 0.4   # few faces = a scene/vlog, not a talking head
     if B.scene_mode: log("compose: few faces found - treating this as a scene video: cards go to the lower area and panels are only allowed where no face is present")
     beats = load_storyboard(cfg["graphics"].get("storyboard"))
     if (cw, ch) != (1080, 1920) and any(b["type"] not in ("broll", "still") for b in beats):
@@ -296,6 +312,14 @@ def write_project(cfg, work, meta, timeline, transcript, groups, project):
         for j, st in enumerate(g["st"]): cjs.append(f'tl.fromTo("#cw{k}_{j}", {{color:"rgba(255,255,255,.52)"}}, {{color:"rgba(255,255,255,1)", duration:.1, ease:"none"}}, {round(max(g["t0"], st - .02), 3)});')
         cjs.append(f'tl.to("#cg{k}", {{opacity:0, duration:.1, ease:"power2.in"}}, {round(max(g["t0"], g["t1"] - .1), 3)});'); cjs.append(f'tl.set("#cg{k}", {{opacity:0, visibility:"hidden"}}, {g["t1"]});')
     ctop = 1530 if ch >= cw else int(ch * 0.80)
+    runs = []                                                           # the caption pill is only on screen while someone is being captioned
+    for g in groups:
+        if runs and g["t0"] - runs[-1][1] < 0.6: runs[-1][1] = g["t1"]
+        else: runs.append([g["t0"], g["t1"]])
+    pill_js = ['tl.set("#cap-pill", {opacity:0}, 0);']
+    for a_, b_ in runs:
+        pill_js.append(f'tl.fromTo("#cap-pill", {{opacity:0, y:12}}, {{opacity:1, y:0, duration:.25, ease:"power2.out"}}, {max(0.0, a_ - 0.12):.3f});')
+        pill_js.append(f'tl.to("#cap-pill", {{opacity:0, y:8, duration:.25, ease:"power2.in"}}, {b_ + 0.05:.3f});')
     cap = f'''<template>
   <style>
     @font-face {{ font-family: 'Deva'; src: url('assets/fonts/NotoSansDevanagari-800.woff2') format('woff2'); font-weight: 100 900; unicode-range: U+0900-097F, U+200C-200D, U+25CC; }}
@@ -316,7 +340,7 @@ def write_project(cfg, work, meta, timeline, transcript, groups, project):
         el.style.fontSize = Math.min(54, r.fontSize) + "px";
       }});
       {chr(10).join("      " + l for l in cjs)}
-      tl.fromTo("#cap-pill", {{opacity:0}}, {{opacity:1, duration:.3, ease:"power2.out"}}, 0.05);
+      {chr(10).join("      " + l for l in pill_js)}
       window.__timelines["captions"] = tl;
     }});
   </script>
@@ -333,7 +357,11 @@ def write_project(cfg, work, meta, timeline, transcript, groups, project):
 '''
     open(os.path.join(project, "compositions", "ui.html"), "w").write(ui if gcfg["progress_bar"] else ui.replace('<div id="ui-track"></div><div id="ui-fill"></div>', ""))
     seams = []; a = 0.0
-    for s_, e_ in timeline["keep"][:-1]: a += e_ - s_; seams.append(round(a, 3))
+    for s_, e_ in timeline["keep"][:-1]: a += e_ - s_; seams.append(round(a + shift, 3))
+    if shift:
+        ij = json.load(open(os.path.join(work, "intro.json")))
+        for t_ in ij.get("cuts", []): B.ev("swipe", t_)                       # soft whoosh on every cut inside the intro
+        B.ev("broll", shift)                                                  # intro -> talk
     zl = [1.0, 1.08, 1.03, 1.09, 1.05, 1.07, 1.02, 1.06]; zoom = ['tl.set("#pzoom", {scale:1.0}, 0);']
     for i, t in enumerate(seams):                                  # a small punch-in on every jump cut hides the cut
         z = zl[i % len(zl)]; zoom.append(f'tl.fromTo("#pzoom", {{scale:{round(z + .03, 3)}}}, {{scale:{z}, duration:.3, ease:"power3.out", immediateRender:false}}, {t});')
@@ -347,7 +375,8 @@ def write_project(cfg, work, meta, timeline, transcript, groups, project):
  #fade {{ position:absolute; inset:0; background:{gcfg["background"]}; opacity:0; }}</style></head>
 <body><div id="root" data-composition-id="main" data-start="0" data-duration="{dur}" data-width="{cw}" data-height="{ch}">
 <div id="bg"></div>
-<div id="pw" data-layout-allow-overflow><div id="pzoom" data-layout-allow-overflow><video id="presenter" class="clip" src="assets/presenter.mp4" muted playsinline data-start="0" data-duration="{dur}" data-track-index="0"></video></div></div>
+<div id="pw" data-layout-allow-overflow><div id="pzoom" data-layout-allow-overflow><video id="presenter" class="clip" src="assets/presenter.mp4" muted playsinline data-start="{shift}" data-duration="{sdur}" data-track-index="0"></video></div></div>
+{('<div id="iw" style="position:absolute;left:0;top:0;width:' + str(cw) + 'px;height:' + str(ch) + 'px;overflow:hidden"><video id="introv" class="clip" src="assets/intro.mp4" muted playsinline data-start="0" data-duration="' + str(shift) + '" data-track-index="1" style="position:absolute;left:0;top:0;width:' + str(cw) + 'px;height:' + str(ch) + 'px;object-fit:cover"></video></div>') if shift else ""}
 <div id="graphics" data-composition-id="graphics" data-composition-src="compositions/graphics.html" data-start="0" data-duration="{dur}" data-track-index="3" data-track-kind="graphics" data-width="{cw}" data-height="{ch}"></div>
 <div id="captions" data-composition-id="captions" data-composition-src="compositions/captions.html" data-start="0" data-duration="{dur}" data-track-index="4" data-track-kind="captions" data-width="{cw}" data-height="{ch}"></div>
 <div id="ui" data-composition-id="ui" data-composition-src="compositions/ui.html" data-start="0" data-duration="{dur}" data-track-index="5" data-track-kind="graphics" data-width="{cw}" data-height="{ch}"></div>
@@ -361,6 +390,6 @@ window.__timelines["main"] = tl;</script></body></html>
     open(os.path.join(project, "index.html"), "w").write(root)
     for f in ("hyperframes.json", "meta.json", "package.json"):
         if not os.path.exists(os.path.join(project, f)): raise FileNotFoundError(f"{f} missing in the project: run `vek init-project` first")
-    sched = dict(events=B.events, rects=B.rects, seams=seams, duration=dur, canvas=[cw, ch])
+    sched = dict(events=B.events, rects=B.rects, seams=seams, duration=dur, canvas=[cw, ch], shift=shift, skip_face_check=[[0, shift]] if shift else [])
     json.dump(sched, open(os.path.join(work, "schedule.json"), "w")); log(f"compose: {len(beats)} beats, {len(groups)} caption groups, {len(B.events)} sound events")
     return sched

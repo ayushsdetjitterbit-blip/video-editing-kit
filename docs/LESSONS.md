@@ -12,3 +12,10 @@
 - **Don't `pkill -f` a pattern that appears in your own command line** - it kills the shell. Match by PID.
 - **Aurora/blur backgrounds and wall-dimming with a matte create halos and "noise"**: removed in favour of a plain background and a gentle highlight roll-off.
 - Stock B-roll from Mixkit is 720p; stretched to 9:16 it is soft. Keep full-screen moments short.
+
+## Vlog with a hesitant speaker (art gallery)
+- Cutting **every** pause of a speaker who pauses a lot gives a jerky, laggy video (46 cuts, 8 in the first 10 s). `cut.pause_keep: 0.5` keeps natural pauses and only cuts where something was really removed (22 segments).
+- Wobble comes from `vidstab` on wide-angle phone footage and from ghosting dissolves: intro clips now use hard cuts and no stabilisation by default.
+- Whisper word times can be off by 0.3 s in noisy rooms: cut fillers by the energy curve, and verify by re-transcribing the cleaned audio (the prompt that makes Whisper write "uh" also makes it hallucinate "uh" at splices; judge by word probability).
+- Cards over painting close-ups hide the content: use `chip` beats (small label at the top) or `on_conflict: chip`.
+- A render can die at 95% when the disk fills with PNG frames (about 2 MB per frame): clean `/tmp/hyperframes-extract-cache-0`, vek now falls back to JPEG frames and retries.

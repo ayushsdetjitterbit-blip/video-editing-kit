@@ -18,7 +18,7 @@ def run_qa(video, work, cfg, meta, timeline):
     def chk(name, ok, detail, warn=False):
         nonlocal ok_all; checks.append(dict(name=name, status="pass" if ok else ("warn" if warn else "FAIL"), detail=detail)); ok_all = ok_all and (ok or warn)
     p = probe(video); chk("size", (p["width"], p["height"]) == (cw, ch), f"{p['width']}x{p['height']} expected {cw}x{ch}")
-    chk("duration", abs(p["duration"] - timeline["duration"]) < 0.15, f"{p['duration']:.2f}s expected {timeline['duration']:.2f}s")
+    chk("duration", abs(p["duration"] - sched["duration"]) < 0.15, f"{p['duration']:.2f}s expected {sched['duration']:.2f}s")
     chk("audio", p["has_audio"], "audio track present" if p["has_audio"] else "NO AUDIO")
     lufs, peak = loudness(video); tgt = cfg["audio"]["target_lufs"]
     chk("loudness", lufs is not None and abs(lufs - tgt) <= 1.5, f"{lufs} LUFS (target {tgt})")
@@ -29,7 +29,7 @@ def run_qa(video, work, cfg, meta, timeline):
     for k, f in enumerate(fr):
         t = k / 4.0
         if f.mean() < 8 and t < sched["duration"] - 0.6: black.append(round(t, 2))
-        if any(r["t0"] <= t <= r["t1"] for r in fulls): continue
+        if any(r["t0"] <= t <= r["t1"] for r in fulls) or any(a <= t <= b for a, b in sched.get("skip_face_check", [])): continue
         g = cv2.equalizeHist(cv2.cvtColor(f[: int(ch * 0.65)], cv2.COLOR_GRAY2BGR if False else cv2.COLOR_BGR2GRAY))
         r_ = cc.detectMultiScale(g, 1.1, 5, minSize=(int(cw * 0.12), int(cw * 0.12)), maxSize=(int(cw * 0.8), int(cw * 0.8)))
         if not len(r_): miss.append(round(t, 2)); continue

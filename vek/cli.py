@@ -6,10 +6,10 @@
   doctor              check that the tools and models are available
 """
 import argparse, json, os, shutil, sys, yaml
-from . import config as C, ingest as I, transcribe as T, cut as K, voice as V, picture as P, captions as CA, compose as CO, mix as MX, render as R, qa as Q
+from . import intro as IN, config as C, ingest as I, transcribe as T, cut as K, voice as V, picture as P, captions as CA, compose as CO, mix as MX, render as R, qa as Q
 from .util import Stage, fp, log, which, probe
 
-STAGES = ["ingest", "transcribe", "cut", "voice", "picture", "compose", "mix", "render", "qa"]
+STAGES = ["ingest", "transcribe", "cut", "voice", "picture", "intro", "compose", "mix", "render", "qa"]
 
 def paths(cfg):
     work = cfg["workdir"]; return work, os.path.join(os.path.dirname(work), "project") if os.path.basename(work) == "work" else os.path.join(work, "project")
@@ -25,7 +25,9 @@ def run_pipeline(cfg_path, stages=None):
     # ---- transcribe
     if need("transcribe", cfg["input"], cfg["language"], cfg["cut"]["pause_min"], cfg["cut"]["verbatim"]):
         T.transcribe(work, cfg["language"], cfg["cut"]["pause_min"], verbatim=cfg["cut"]["verbatim"]); S.mark("transcribe", fp(cfg["input"], cfg["language"], cfg["cut"]["pause_min"], cfg["cut"]["verbatim"]))
-    tr = json.load(open(os.path.join(work, "transcript.json")))
+    trp = os.path.join(work, "transcript.json")
+    if not os.path.exists(trp): return 0                      # only ingest was requested
+    tr = json.load(open(trp))
     # ---- cut
     if need("cut", cfg["input"], cfg["cut"], tr["language"]):
         K.cut_stage(cfg, work, meta); S.mark("cut", fp(cfg["input"], cfg["cut"], tr["language"])); [S.clear(s) for s in ("voice", "picture", "compose", "mix", "render", "qa")]
@@ -39,21 +41,28 @@ def run_pipeline(cfg_path, stages=None):
     pfp = fp(os.path.join(work, "timeline.json"), cfg["picture"], meta["canvas"])
     if need("picture", pfp):
         st = P.analyze(work, meta); pl = P.plan(cfg, st, meta); json.dump(pl, open(os.path.join(work, "picture_plan.json"), "w")); P.presenter(cfg, work, meta, st, pl); S.mark("picture", pfp)
+    # ---- intro clips before the talk (optional)
+    base = os.path.dirname(os.path.abspath(cfg_path)); ifp = fp(cfg.get("intro") or {}, cfg["picture"]["look"], meta["canvas"], meta["fps"])
+    if (cfg.get("intro") or {}).get("clips"):
+        if need("intro", ifp): IN.build(cfg, work, meta, base); S.mark("intro", ifp)
+        ij = os.path.join(work, "intro.json")
+        if os.path.exists(ij): meta["intro_len"] = json.load(open(ij))["duration"]
     # ---- compose (cheap: always rebuild when asked, it depends on the storyboard)
     groups = None
     if "compose" in want or "mix" in want or "render" in want:
-        M = CA.mapper(tl); kept = sorted({w for seg in tl["windows_per_segment"] for w in seg})
+        shift = float(meta.get("intro_len", 0) or 0); M = CA.mapper(tl, shift); kept = sorted({w for seg in tl["windows_per_segment"] for w in seg})
         cf = os.path.join(os.path.dirname(os.path.abspath(cfg_path)), "captions_chunks.yaml")
-        chunks = CA.chunks_from_file(cf, tr) if os.path.exists(cf) else CA.chunks_from_transcript(tr, tl, cfg, kept); groups = CA.apply_draft(CA.build_groups(chunks, M, round(tl["duration"], 2), meta["fps"]), work)
+        chunks = CA.chunks_from_file(cf, tr) if os.path.exists(cf) else CA.chunks_from_transcript(tr, tl, cfg, kept); groups = CA.apply_draft(CA.build_groups(chunks, M, round(tl["duration"] + shift, 2), meta["fps"]), work)
         CA.write_draft(work, groups)
         R.init_project(project, cfg["render"]["hyperframes_version"], work, os.path.join(os.path.dirname(os.path.abspath(cfg_path)), "assets")); R.link_presenter(work, project)
+        if shift: R.link_file(os.path.join(work, "intro.mp4"), os.path.join(project, "assets", "intro.mp4"))
         sched = CO.write_project(cfg, work, meta, tl, tr, groups, project)
     # ---- mix
-    if "mix" in want: MX.build(cfg, work, project, tl["duration"])
+    if "mix" in want: MX.build(cfg, work, project, tl["duration"] + float(meta.get("intro_len", 0) or 0), float(meta.get("intro_len", 0) or 0))
     # ---- render + qa
     out = os.path.join(os.path.dirname(work) if os.path.basename(work) == "work" else work, "final_HQ.mp4")
     if "render" in want:
-        R.render(project, out, cfg, tl["duration"], meta["fps"])
+        R.render(project, out, cfg, tl["duration"] + float(meta.get("intro_len", 0) or 0), meta["fps"])
     if "qa" in want and os.path.exists(out):
         rep = Q.run_qa(out, work, cfg, meta, tl); print("QA PASSED" if rep["passed"] else "QA FAILED - see qa_report.json"); return 0 if rep["passed"] else 2
     return 0

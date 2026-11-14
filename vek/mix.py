@@ -30,10 +30,10 @@ def reverb(x, rt=0.28, mix=0.09, seed=3):
 
 def _rd(p): w = wave.open(p); return np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float64) / 32768
 
-def build(cfg, work, project, dur):
+def build(cfg, work, project, dur, shift=0.0):
     ac = cfg["audio"]; N = int((dur + 0.05) * SR); T = np.arange(N) / SR; sched = json.load(open(os.path.join(work, "schedule.json")))
-    v = _rd(os.path.join(work, "voice_enh.wav")); voice = np.zeros(N); voice[:min(N, len(v))] = v[:N]
-    music = np.zeros((N, 2)); vrms = np.sqrt(np.mean(voice ** 2)) + 1e-9
+    v = _rd(os.path.join(work, "voice_enh.wav")); voice = np.zeros(N); o = int(shift * SR); k = min(N - o, len(v)); voice[o:o + k] = v[:k]
+    music = np.zeros((N, 2)); vrms = np.sqrt(np.mean(voice[o:] ** 2)) + 1e-9
     if ac.get("music"):
         raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", "0.3", "-t", str(dur + 0.1), "-i", ac["music"], "-ac", "2", "-ar", str(SR), "-af", "highpass=f=70,lowpass=f=12000,equalizer=f=2200:t=q:w=0.8:g=-3.5", "-f", "f32le", "-"], capture_output=True).stdout
         mu = np.frombuffer(raw, np.float32).reshape(-1, 2).astype(np.float64); music[:min(N, len(mu))] = mu[:N]
@@ -41,6 +41,9 @@ def build(cfg, work, project, dur):
         music *= (np.minimum(1, T / 1.2) * np.clip((dur - T) / 2.6, 0, 1))[:, None]
         win = int(0.06 * SR); e = np.sqrt(np.convolve(voice ** 2, np.ones(win) / win, mode="same")); k = np.hanning(int(0.30 * SR)); e = np.convolve(e, k / k.sum(), mode="same")
         music *= (1 - 0.62 * np.clip(e / (np.percentile(e, 90) + 1e-9), 0, 1))[:, None]               # duck under speech
+        if shift:                                                                                     # nobody speaks over the intro: bring the music forward, settle it before the voice starts
+            g = np.ones(N) * db(ac.get("intro_music_boost_db", 7.0)); t_ = np.clip((T - (shift - 1.2)) / 1.2, 0, 1); g = g ** (1 - t_) * 1.0 ** t_
+            music *= g[:, None]
     sfx = np.zeros((N, 2))
     def add(sig, t0, gain=1.0, pan=0.0):
         i = int(t0 * SR)
@@ -59,6 +62,7 @@ def build(cfg, work, project, dur):
             elif kd == "card":
                 add(pop(520, 920, 0.09), t + 0.04, db(-19))
                 if ev.get("hook"): add(thump(60, 0.4, 0.14), t + 0.02, db(-16))
+            elif kd == "swipe": add(whoosh(0.24, 500, 3600, 300 + k), t - 0.14, db(-21), pan=0.35 if k % 2 else -0.35)
             elif kd == "tick": add(bell(midi(91), 0.6, 0.16), t + 0.1, db(-23))
             elif kd == "warn": add(thump(110, 0.14, 0.05), t + 0.03, db(-18)); add(pop(400, 600, 0.08), t + 0.04, db(-22))
             elif kd == "vs_right": add(thump(60, 0.5, 0.15), t, db(-17))

@@ -88,6 +88,13 @@ def build(windows, cfg, fps, duration, language, db=None):
         mp = sum(x["p"] for x in w["words"]) / max(1, len(w["words"])); edge = (i == 0 or i == len(windows) - 1)
         if d < mw and ((n <= 1 and (mp < 0.15 or edge)) or d / max(n, 1) < 0.12) and i not in c.get("keep_windows", []):
             keep_idx.remove(i); dropped.append(dict(index=i, reason="blip / interjection", text=w["text"]))
+    pk = c.get("pause_keep"); bridge = {}                                   # natural pauses between neighbouring kept windows
+    if pk:
+        for p, q in zip(keep_idx, keep_idx[1:]):
+            if q == p + 1:                                                # nothing was removed between them
+                g = windows[q]["a"] - windows[p]["b"]
+                bridge[(p, "end")] = windows[q]["a"] if g <= pk else windows[p]["b"] + pk / 2     # short pause: keep it whole, no cut at all
+                bridge[(q, "start")] = windows[p]["b"] if g <= pk else windows[q]["a"] - pk / 2   # long pause: shorten it to `pause_keep`
     for i in keep_idx:
         w = windows[i]
         a0 = w["a"]
@@ -96,6 +103,8 @@ def build(windows, cfg, fps, duration, language, db=None):
             if not spoken: a0 = w["a_strict"] - 0.05      # breath / lip noise before the first word (never trims a quiet but real word)
         a = float(c["start_overrides"].get(i, c["start_overrides"].get(str(i), a0))) - c["pad_before"]
         b = float(c["end_overrides"].get(i, c["end_overrides"].get(str(i), w["b"]))) + c["pad_after"]
+        if (i, "start") in bridge: a = bridge[(i, "start")]
+        if (i, "end") in bridge: b = bridge[(i, "end")]
         a, b = max(0.0, a), min(duration, b); pieces = [[a, b]]
         for xs, xe, why, txt in excisions(w, c, language):
             xs, xe = snap(db, xs), snap(db, xe)

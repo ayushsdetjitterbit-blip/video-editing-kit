@@ -1,0 +1,14 @@
+beats:
+  # ---- over the gallery walk (times on the FINISHED video)
+  - {type: card, final: true, at: 0.5, until: 3.6, icon: star, color: "#5E5CE6", title: "Art Gallery", sub: "A walk through the exhibition", hook: true}
+  # ---- the talk (times are source seconds of the talking video)
+  - {type: card, at: 4.93, until: 8.0, icon: star, color: "#0A84FF", title: "Art exhibition", sub: "At the Russian House", on_conflict: chip}
+  - {type: chip, at: 24.0, until: 29.5, icon: user, color: "#FF9F0A", title: "Two paintings", sub: "Created by a friend"}
+  - {type: chip, at: 33.4, until: 37.5, icon: heart, color: "#FF375F", title: "Painting 1", sub: "A tribal woman"}
+  - {type: chip, at: 45.8, until: 51.8, icon: check, color: "#30D158", title: "1 · Closed eyes", sub: "Calm and confident"}
+  - {type: chip, at: 60.9, until: 66.5, icon: star, color: "#FF9F0A", title: "2 · Ornaments", sub: "Culture and tradition"}
+  - {type: chip, at: 79.6, until: 83.6, icon: heart, color: "#FF375F", title: "3 · Beauty & calmness", sub: "The feeling of the whole picture"}
+  - {type: chip, at: 85.2, until: 89.5, icon: bulb, color: "#FF9F0A", title: "Painting 2", sub: "A red tram in a black & white street"}
+  - {type: chip, at: 97.0, until: 101.0, icon: flame, color: "#FF453A", title: "Red = life", sub: "The one colour that stands out"}
+  - {type: chip, at: 115.9, until: 120.3, icon: shield, color: "#30D158", title: "Find your centre", sub: "Peace and happiness within yourself"}
+  - {type: card, at: 133.1, until: 134.9, icon: heart, color: "#FF375F", title: "Thank you", sub: "for watching", on_conflict: chip}

@@ -1,0 +1,35 @@
+input: ../talk.mp4
+workdir: work
+language: en
+fps: 30                      # 30 fps: smooth, WhatsApp/Reels standard, half the render time of the 60 fps source
+cut:
+  pause_keep: 0.5            # keep the speaker's natural pauses (no cut inside a pause shorter than 0.5 s) -> far fewer jump cuts
+  drop_filler_words: false   # fillers are cut by hand from the energy curve (Whisper word times drift by up to 0.3 s in this recording)
+  drop_windows: [31, 37, 41, 45]
+  excise:
+    - [3.82, 3.96]
+    - [5.67, 5.91]
+    - [8.53, 8.80]
+    - [11.31, 11.53]
+    - [14.34, 14.70]
+    - [15.83, 16.03]
+    - [47.74, 48.12]
+    - [53.95, 54.50]
+    - [108.79, 109.14]
+    - [123.38, 124.66]
+    - [132.15, 132.60]
+intro:
+  stabilize: false
+  dissolve: 0
+  clips:
+    - {file: ../gallery.mp4, start: 4, end: 9}
+    - {file: ../gallery.mp4, start: 13, end: 19}
+    - {file: ../gallery.mp4, start: 24, end: 28}
+picture:
+  face_restore: "off"
+  look: natural
+graphics:
+  storyboard: storyboard.yaml
+audio:
+  music: assets/music_34.mp3
+  intro_music_boost_db: 8

@@ -26,19 +26,29 @@ def link_presenter(work, project):
     if os.path.lexists(dst): os.remove(dst)
     os.symlink(os.path.abspath(os.path.join(work, "presenter.mp4")), dst)
 
+def link_file(src, dst):
+    if os.path.lexists(dst): os.remove(dst)
+    os.symlink(os.path.abspath(src), dst)
+
 def free_gb(path): return shutil.disk_usage(path).free / 1e9
 
 def render(project, out, cfg, dur, fps):
     if not os.path.exists(os.path.join(project, "assets", "mix.m4a")): raise RuntimeError("assets/mix.m4a is missing: run the `mix` stage before `render`")
     need = 0.12 * dur * fps / 30 / 1.0                      # PNG frame cache: ~2 MB per frame at 1080x1920, plus the output
-    need = dur * fps * 2.1e6 / 1e9 + 1
-    if free_gb(project) < need: raise RuntimeError(f"not enough free disk for the render: need about {need:.1f} GB, have {free_gb(project):.1f} GB")
+    need = dur * fps * 2.1e6 / 1e9 + 1                                      # PNG frames of the video layers (the intro and the talk never play at the same time)
+    png = free_gb(project) >= need + 3
+    if not png:
+        log(f"render: only {free_gb(project):.1f} GB free (PNG frames need about {need:.1f} GB): using JPEG frames, which are about 6x smaller")
+        if free_gb(project) < 3 + dur * fps * 0.35e6 / 1e9: raise RuntimeError(f"not enough free disk for the render: have {free_gb(project):.1f} GB")
     shutil.rmtree("/tmp/hyperframes-extract-cache-0", ignore_errors=True)
     r = cfg["render"]; ver = r["hyperframes_version"]
     log(f"render: {dur:.1f}s at {fps} fps (about {dur * 12 / 60:.0f}-{dur * 15 / 60:.0f} min)")
-    p = subprocess.run(["npx", "--yes", f"hyperframes@{ver}", "render", "--quality", r["quality"], "--crf", str(r["crf"]), "--video-frame-format", "png", "-o", os.path.abspath(out)],
-                       cwd=project, capture_output=True, text=True)
-    shutil.rmtree("/tmp/hyperframes-extract-cache-0", ignore_errors=True)
+    for attempt in (1, 2, 3):                                           # the headless browser very rarely dies near the end of a long render: try again
+        p = subprocess.run(["npx", "--yes", f"hyperframes@{ver}", "render", "--quality", r["quality"], "--crf", str(r["crf"]), "--video-frame-format", "png" if png else "jpg", "-o", os.path.abspath(out)],
+                           cwd=project, capture_output=True, text=True)
+        shutil.rmtree("/tmp/hyperframes-extract-cache-0", ignore_errors=True)
+        if p.returncode == 0 and os.path.exists(out): break
+        log(f"render attempt {attempt} failed: {(p.stdout + p.stderr)[-300:].strip()[-200:]}")
     if p.returncode != 0 or not os.path.exists(out): raise RuntimeError("render failed:\n" + (p.stdout + p.stderr)[-2500:])
     return out
 

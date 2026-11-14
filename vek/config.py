@@ -11,6 +11,7 @@ DEFAULTS = {
     "cut": {
         "pause_min": 0.25,               # pauses shorter than this stay (natural beats)
         "pad_before": 0.07, "pad_after": 0.10,
+        "pause_keep": None,              # e.g. 0.5: pauses up to this long stay untouched (no cut), longer ones are shortened to it. None = cut every pause (tight, energetic)
         "drop_fillers": True,            # drop a window that is ONLY a filler (um, uh, ...), never cut inside a sentence
         "trim_breath": True,            # trim a breath / mouth noise (>= 0.25 s) before the first word of a phrase
         "drop_filler_words": True,       # cut um/uh/ahh/hmm words out of a sentence (at word boundaries, snapped to quiet points)
@@ -32,6 +33,7 @@ DEFAULTS = {
         "look": "natural",               # natural | punchy | off   (adaptive: measured from the video itself)
     },
     "captions": {"enabled": True, "max_words": 4, "max_chars": 26, "corrections": {}, "style": "pill"},
+    "intro": None,                       # optional clips before the talk, see vek/intro.py
     "graphics": {"storyboard": None, "progress_bar": True, "background": "#B4AFA5", "accent": "#0A84FF"},
     "audio": {"music": None, "music_level_db": -9.5, "sfx": True, "target_lufs": -14},   # music_level_db: relative to the voice level, before ducking
     "render": {"quality": "delivery", "crf": 14, "hyperframes_version": "0.8.225"},
@@ -46,6 +48,8 @@ def load(path):
         if cfg.get(k) and not os.path.isabs(cfg[k]): cfg[k] = os.path.normpath(os.path.join(base, cfg[k]))
     sb = cfg["graphics"].get("storyboard")
     if sb and not os.path.isabs(sb): cfg["graphics"]["storyboard"] = os.path.normpath(os.path.join(base, sb))
+    for c_ in (cfg.get("intro") or {}).get("clips", []):
+        if c_.get("file") and not os.path.isabs(c_["file"]): c_["file"] = os.path.normpath(os.path.join(base, c_["file"]))
     m = cfg["audio"].get("music")
     if m and not os.path.isabs(m): cfg["audio"]["music"] = os.path.normpath(os.path.join(base, m))
     if not cfg["input"] or not os.path.isfile(cfg["input"]): raise FileNotFoundError(f"input video not found: {cfg['input']}")

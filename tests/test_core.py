@@ -51,6 +51,22 @@ class WordLevelTests(unittest.TestCase):
         db = np.full(300, -20.0); db[148:152] = -60.0
         self.assertAlmostEqual(cut.snap(db, 1.0), 1.5 - 0.0, delta=0.6) if False else self.assertTrue(abs(cut.snap(db, 1.47) - 1.50) < 0.02)
 
+class NaturalPaceTests(unittest.TestCase):
+    def test_pause_keep_bridges_short_pauses_and_shortens_long_ones(self):
+        cfg = dict(cut=dict(CFG["cut"], pause_keep=0.5))
+        wins = [W(0.0, 2.0, "first part here"), W(2.35, 4.0, "second part here"), W(5.5, 7.0, "third part here")]   # gaps 0.35 s (kept whole) and 1.5 s (shortened)
+        keep, _, _ = cut.build(wins, cfg, 30, 8.0, "en")
+        self.assertEqual(len(keep), 2)                                       # the 0.35 s pause is NOT a cut
+        self.assertAlmostEqual(keep[0][1] / 30, 4.25, delta=0.04); self.assertAlmostEqual(keep[1][0] / 30, 5.25, delta=0.04)
+    def test_default_still_cuts_every_pause(self):
+        keep, _, _ = cut.build([W(0.0, 2.0, "first part here"), W(2.35, 4.0, "second part here")], CFG, 30, 8.0, "en"); self.assertEqual(len(keep), 2)
+    def test_captions_skip_removed_words_and_fillers(self):
+        tr = dict(windows=[dict(a=0, b=3, text="", words=[dict(w="So", s=0, e=.3, p=.9), dict(w="uh,", s=.4, e=.6, p=.5), dict(w="my,", s=.7, e=.9, p=.1), dict(w="friend", s=1.0, e=1.4, p=.9)])])
+        cfg = dict(cut=dict(excise=[[.65, .95]]), captions=dict(max_words=4, max_chars=26, corrections={}))
+        ch = captions.chunks_from_transcript(tr, dict(removed=[]), cfg, [0]); self.assertEqual(ch[0][1], "So friend")
+    def test_final_clock_beats_are_not_mapped(self):
+        R = compose.Resolver(dict(windows=[]), lambda t: t + 100, 50); self.assertEqual(R.t(dict(at=2, final=True), "at"), 2.0); self.assertEqual(R.t(dict(at=2), "at"), 102)
+
 class LoopTests(unittest.TestCase):
     def test_loop_detected_and_collapsed(self):
         w = [dict(w=x) for x in ("a b " + "x y z " * 4 + "end").split()]
