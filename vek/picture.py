@@ -11,7 +11,8 @@ import cv2
 from .util import run, log
 
 CASCADE_URL = "https://raw.githubusercontent.com/opencv/opencv/4.x/data/haarcascades/haarcascade_frontalface_alt2.xml"
-MODEL_URLS = {"gpen_bfr_512.onnx": "https://huggingface.co/facefusion/models-3.0.0/resolve/main/gpen_bfr_512.onnx"}
+MODEL_URLS = {"gpen_bfr_512.onnx": "https://huggingface.co/facefusion/models-3.0.0/resolve/main/gpen_bfr_512.onnx",
+              "esrgan_x4v3.onnx": "https://huggingface.co/tamnvcc/Real-ESRGAN-General-x4v3_float/resolve/main/onnx/model.onnx"}
 
 def models_dir(): return os.environ.get("VEK_MODELS", os.path.join(os.path.expanduser("~"), ".cache", "vek", "models"))
 
@@ -86,8 +87,11 @@ def plan(cfg, st, meta):
     face = pc["face_restore"]
     if face == "auto": face = "gpen" if (st["face_found_ratio"] >= 0.6 and st.get("face_w", 1) * st["width"] < 420 and st["width"] <= 800) else "off"
     lp = look_params(st, pc["look"])
-    p = dict(denoise=float(den), face_restore=face, relight=bool(pc["relight"]) and face != "off", look=lp, canvas=[cw, ch])
-    log(f"picture plan: denoise {p['denoise']:.2f}, face_restore {p['face_restore']}, look strength {lp['strength'] if lp else 'off'}")
+    dt = pc.get("detail", "auto")
+    if dt == "auto": dt = 0.85 if st["width"] <= 900 else 0.0           # neural detail only helps small sources
+    elif dt in ("off", False, None): dt = 0.0
+    p = dict(denoise=float(den), face_restore=face, relight=bool(pc["relight"]) and face != "off", look=lp, canvas=[cw, ch], detail=float(dt))
+    log(f"picture plan: denoise {p['denoise']:.2f}, detail {p['detail']:.2f}, face_restore {p['face_restore']}, look strength {lp['strength'] if lp else 'off'}")
     return p
 
 # ------------------------------------------------------------------ rendering
@@ -108,6 +112,7 @@ def _cover(f, cw, ch, cx):
     return b[y0:y0 + ch, x0:x0 + cw], s, x0, y0
 
 def presenter(cfg, work, meta, st, plan_):
+    work = os.path.abspath(work)                       # the concat list needs absolute paths
     cw, ch = plan_["canvas"]; fps = meta["fps"]; w, h = st["width"], st["height"]; n = st["frames"]
     cx = st.get("face_cx", 0.5); out_final = os.path.join(work, "presenter.mp4")
     src = os.path.join(work, "clean_master.mp4")
@@ -118,17 +123,22 @@ def presenter(cfg, work, meta, st, plan_):
             _drop_chunks(work); run(["ffmpeg", "-v", "error", "-y", "-i", src, "-vf", vf, "-c:v", "libx264", "-crf", "10", "-preset", "veryfast", "-an", dn]); open(dn + ".sig", "w").write(_sig(src, k))
         src = dn
     lf = look_filter(plan_["look"])
-    if plan_["face_restore"] == "off":
+    det = None
+    if plan_.get("detail", 0) > 0:
+        from .detail import Detail
+        sc = max(cw / w, ch / h); det = Detail(ensure_file("esrgan_x4v3.onnx", MODEL_URLS["esrgan_x4v3.onnx"]), w, h, int(round(w * sc)), int(round(h * sc)), stride=5, threads=min(4, os.cpu_count() or 2))
+    if plan_["face_restore"] == "off" and det is None:
         vfs = [f"scale={cw}:{ch}:force_original_aspect_ratio=increase:flags=lanczos", f"crop={cw}:{ch}:max(0\\,min(iw-{cw}\\,{cx:.4f}*iw-{cw}/2)):(ih-{ch})/2", lf]
         run(["ffmpeg", "-v", "error", "-y", "-i", src, "-vf", ",".join(v for v in vfs if v != "null"), "-c:v", "libx264", "-crf", "12", "-preset", "medium",
              "-pix_fmt", "yuv420p", "-g", str(int(fps)), "-movflags", "+faststart", "-an", out_final]); return out_final
-    # ---- face restoration, resumable chunks (each decoded on its own: memory stays bounded for any video length)
+    # ---- neural detail and/or face restoration, resumable chunks (each decoded on its own: memory stays bounded for any video length)
     sigf = os.path.join(work, "chunks.sig"); cur = _sig(src, 0)
     if (open(sigf).read() if os.path.exists(sigf) else "") != cur: _drop_chunks(work); open(sigf, "w").write(cur)
     import onnxruntime as ort
     ort.set_default_logger_severity(4); cv2.setNumThreads(2)
     so = ort.SessionOptions(); so.intra_op_num_threads = min(4, os.cpu_count() or 2)
-    gp = ort.InferenceSession(ensure_file("gpen_bfr_512.onnx", MODEL_URLS["gpen_bfr_512.onnx"]), providers=["CPUExecutionProvider"], sess_options=so)
+    do_face = plan_["face_restore"] != "off"
+    gp = ort.InferenceSession(ensure_file("gpen_bfr_512.onnx", MODEL_URLS["gpen_bfr_512.onnx"]), providers=["CPUExecutionProvider"], sess_options=so) if do_face else None
     cc = cascade(); chunk = 300; cdir = os.path.join(work, "chunks"); os.makedirs(cdir, exist_ok=True); strength = float(cfg["picture"]["face_strength"])
     for a0 in range(0, n, chunk):
         a1 = min(n, a0 + chunk); name = os.path.join(cdir, f"p_{a0:06d}.mp4")
@@ -136,8 +146,13 @@ def presenter(cfg, work, meta, st, plan_):
         t0 = time.time(); fr = read_frames(src, w, h, a0, a1 - a0, fps); box = None; dface = None
         enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", f"{cw}x{ch}", "-r", str(fps), "-i", "-", "-c:v", "libx264", "-crf", "13",
                                 "-preset", "medium", "-pix_fmt", "yuv420p", "-g", str(int(fps)), name], stdin=subprocess.PIPE)
+        gcache = {}; dcache = {}; gray = lambda j: cv2.cvtColor(fr[j], cv2.COLOR_BGR2GRAY)
         for i, f in enumerate(fr):
             base, s, x0, y0 = _cover(f, cw, ch, cx)
+            if det is not None:                                  # neural detail layer (keyframes + optical-flow transfer), then everything else works on the sharper picture
+                Dl = det.layer(fr, i, dcache, gray) * plan_["detail"]
+                base = np.clip(base.astype(np.float32) + Dl[y0:y0 + ch, x0:x0 + cw], 0, 255).astype(np.uint8)
+            if not do_face: enc.stdin.write(base.tobytes()); continue
             if i % 2 == 0 or dface is None:
                 g = cv2.equalizeHist(cv2.cvtColor(f, cv2.COLOR_BGR2GRAY)); r = cc.detectMultiScale(g, 1.1, 5, minSize=(max(40, w // 10), max(40, w // 10)), maxSize=(int(w * 0.8), int(w * 0.8)))
                 if len(r):
